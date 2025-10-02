@@ -20,4 +20,4 @@ hisat2 -p 4 -x sacCer3 -U SRR10143769.fastq -S rna.sam
 samtools sort -o rna.bam rna.sam
 samtools index rna.bam
 
-# Coverage is highest at exons, particularly towards the 3' ends of actively transcribed genes. Intronic regions show little/no coverage, consistent with mature mRNA. (Note: adjust using your observed IGV region.)
+# Coverage is highest at exons, particularly towards the 3' ends of actively transcribed genes. Intronic regions show little/no coverage, consistent with mature mRNA.
