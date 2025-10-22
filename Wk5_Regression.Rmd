@@ -1,0 +1,149 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+
+# Exercise 1
+# Step 1.1
+
+library(tidyverse)
+library(broom)
+
+dnm <- read_csv("/Users/cmdb/qb25-answers/week5/aau1043_dnm.csv")
+
+# Step 1.2
+
+dnm_counts <- dnm %>%
+  filter(!is.na(Phase_combined)) %>%
+  group_by(Proband_id) %>%
+  summarize(
+    maternal_dnm = sum(Phase_combined == "mother"),
+    paternal_dnm = sum(Phase_combined == "father")
+  )
+
+# Step 1.3
+
+ages <- read_csv("/Users/cmdb/qb25-answers/week5/aau1043_parental_age.csv")
+
+# Step 1.4
+
+merged <- left_join(dnm_counts, ages, by = "Proband_id")
+
+```
+
+
+```{r}
+# Exercise 2
+# Step 2.1
+
+ex2_a <- ggplot(merged, aes(x = Mother_age, y = maternal_dnm)) +
+  geom_point(alpha = 0.7) +
+  labs(
+    title = "Maternal DNMs vs. Maternal Age",
+    x = "Maternal Age (years)", y = "Maternal DNMs"
+  ) +
+  theme_minimal()
+ggsave("ex2_a.png", ex2_a, width = 6, height = 4)
+
+ex2_b <- ggplot(merged, aes(x = Father_age, y = paternal_dnm)) +
+  geom_point(alpha = 0.7) +
+  labs(
+    title = "Paternal DNMs vs. Paternal Age",
+    x = "Paternal Age (years)", y = "Paternal DNMs"
+  ) +
+  theme_minimal()
+ggsave("ex2_b.png", ex2_b, width = 6, height = 4)
+
+# Step 2.2
+
+maternal_lm <- lm(maternal_dnm ~ Mother_age, data = merged)
+maternal_lm_tidy <- broom::tidy(maternal_lm)
+print(maternal_lm_tidy)
+
+# Step 2.3
+
+paternal_lm <- lm(paternal_dnm ~ Father_age, data = merged)
+paternal_lm_tidy <- broom::tidy(paternal_lm)
+print(paternal_lm_tidy)
+
+# Step 2.4
+
+predicted_DNMs <- predict(paternal_lm, newdata = tibble(Father_age = 50.5))
+print(predicted_DNMs)
+
+# Step 2.5
+
+ex2_c <- ggplot(merged %>% pivot_longer(cols=c("maternal_dnm","paternal_dnm"), names_to = "parent", values_to = "dnm"),
+                aes(x = dnm, fill = parent)) +
+  geom_histogram(alpha = 0.5, position = "identity", bins = 30) +
+  labs(title = "Maternal vs. Paternal DNMs per Proband",
+       x = "DNMs", y = "Count") +
+  theme_minimal()
+ggsave("ex2_c.png", ex2_c, width = 6, height = 4)
+
+# Step 2.6 — Paired t-test
+
+tt <- t.test(merged$maternal_dnm, merged$paternal_dnm, paired = TRUE)
+print(tt)
+
+# Fit lm with difference ~ 1
+
+diffs <- merged$maternal_dnm - merged$paternal_dnm
+lm_diff <- lm(diffs ~ 1)
+average_difference <- mean(diffs)
+print(average_difference)
+summary(lm_diff)
+
+```
+
+
+```{r}
+# Exercise 3
+# Step 3.1
+
+library(tidyverse)
+
+install.packages("tidytuesdayR")
+
+tuesdata <- tidytuesdayR::tt_load(2025, week = 18)
+
+nsf_terminations <- tuesdata$nsf_terminations
+
+head(nsf_terminations)
+
+# Step 3.2
+
+ex4_a <- nsf_terminations %>%
+  count(org_state) %>%
+  ggplot(aes(x = org_state, y = n)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Number of NSF Terminations per State",
+       x = "State",
+       y = "Count")
+ggsave("ex4_a.png", ex4_a, width = 7, height = 4)
+
+# Step 3.3
+
+nsf_clean <- nsf_terminations %>%
+  filter(!is.na(usaspending_obligated), !is.na(directorate), !is.na(org_state), usaspending_obligated > 0)
+
+nsf_clean <- nsf_clean %>%
+  mutate(log_amount = log10(usaspending_obligated + 1))
+
+lm_dir <- lm(log_amount ~ directorate + org_state, data = nsf_clean)
+summary(lm_dir)
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
