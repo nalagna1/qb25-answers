@@ -1,0 +1,135 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+# Step 1.1
+
+library(matrixStats)
+library(tidyverse)
+
+setwd('/Users/cmdb/qb25-answers/week7')
+
+# Load data
+
+data <- read.table('/Users/cmdb/qb25-answers/week7/read_matrix.tsv',
+                             header=TRUE, row.names=1, sep="\t")
+
+mat <- as.matrix(data)
+
+# Calculate SD for each gene (using matrixStats)
+gene_sd <- rowSds(mat)
+
+# Get indices of the top 500 most variable genes
+top_idx <- order(gene_sd, decreasing=TRUE)[1:500]
+
+# Subset the matrix
+mat_top <- mat[top_idx, ]
+
+# Transpose: PCA expects samples as rows
+mat_top_t <- t(mat_top)
+
+# Run PCA
+pca <- prcomp(mat_top_t, center=TRUE, scale.=TRUE)
+
+# Step 1.3
+
+# Prepare tibble for plotting
+
+df_pca <- as_tibble(pca$x[,1:2]) %>%
+  mutate(sample = colnames(mat_top)) %>%
+  separate(sample, into=c("tissue", "replicate"), sep="_")
+
+# Scatter plot
+
+ggplot(df_pca, aes(x=PC1, y=PC2, color=tissue, shape=replicate)) +
+  geom_point(size=3) +
+  labs(title="PCA of RNA-seq", x="PC1", y="PC2") +
+  theme_bw()
+ggsave("pca_scatterplot.png")
+
+# Calculate percent variance explained for each PC
+pct_var <- pca$sdev^2 / sum(pca$sdev^2) * 100
+var_df <- tibble(PC = factor(1:length(pct_var)), Variance = pct_var)
+
+# Use geom_col to make a bar plot
+
+ggplot(var_df, aes(x = PC, y = Variance)) +
+  geom_col(fill = "lightblue") +
+  labs(title = "Variance Explained by Principal Components",
+       x = "Principal Component",
+       y = "Variance Explained (%)") +
+  theme_minimal()
+
+ggsave("pca_variance_barplot.png", width = 7, height = 4)
+```
+
+
+```{r}
+# Exercise 2: K-means clustering
+
+# 2.1
+# Average every set of 3 replicates per tissue
+
+combined <- mat
+combined <- mat[,seq(1,21,3)] +
+            mat[,seq(2,21,3)] +
+            mat[,seq(3,21,3)]
+combined <- combined / 3
+
+# Calculate SD
+
+combined_sd <- rowSds(combined)
+
+# Filter genes: SD > 1
+
+combined_filt <- combined[combined_sd > 1, ]
+
+# 2.2
+
+set.seed(42)
+km <- kmeans(combined_filt, centers=12, nstart=100)
+labels <- km$cluster
+
+# Sort gene rows by cluster label
+
+sorted_idx <- order(labels)
+combined_sorted <- combined_filt[sorted_idx, ]
+labels_sorted <- labels[sorted_idx]
+
+# Heat map Plot
+
+library(RColorBrewer)
+
+heatmap(combined_sorted, Rowv=NA, Colv=NA, RowSideColors=brewer.pal(12,"Paired")[labels_sorted], ylab="Gene")
+dev.copy(png, "kmeans_heatmap.png")
+dev.off()
+
+ggsave("kmeans_heatmap.png")
+```
+
+
+```{r}
+
+# Exercise 3
+
+genes_cluster3 <- rownames(combined_filt)[which(labels == 3)]
+genes_cluster7 <- rownames(combined_filt)[which(labels == 7)]
+
+cat(genes_cluster3, sep = "\n")
+
+cat(genes_cluster7, sep = "\n")
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
