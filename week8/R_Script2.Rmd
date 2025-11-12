@@ -1,0 +1,194 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+
+# Step 1.1
+
+setwd("/Users/cmdb/qb25-answers/week8/")
+
+library(DESeq2)
+library(tidyverse)
+library(broom)
+
+gene_expr <- read_delim("gtex_whole_blood_counts_downsample.txt")
+metadata <- read_delim("gtex_metadata_downsample.txt")
+gene_loc <- read_delim("gene_locations.txt")
+
+gene_expr <- gene_expr %>% column_to_rownames("GENE_NAME")
+
+head(gene_expr[,1:5])
+head(metadata)
+
+# Step 1.2
+
+all(colnames(gene_expr) == metadata$SUBJECT_ID)
+
+dds <- DESeqDataSetFromMatrix(
+    countData = gene_expr,
+    colData = metadata,
+    design = ~ SEX + DTHHRDY + AGE
+)
+
+# Step 1.3
+
+vsd <- vst(dds)
+
+png("pc_sex.png")
+plotPCA(vsd, intgroup = "SEX")
+dev.off()
+
+png("pc_age.png")
+plotPCA(vsd, intgroup = "AGE")
+dev.off()
+
+png("pc_death.png")
+plotPCA(vsd, intgroup = "DTHHRDY")
+dev.off()
+
+pcaData <- plotPCA(vsd, intgroup = "SEX", returnData=TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+percentVar
+
+# Cause of death appears to be the first PC, while sex appears to be the second PC.
+# 48% of the variance is explained by the first PC, while 7% is explained by the 
+# second PC.
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+```{r}
+# Exercise 2
+
+# Step 2.1
+
+vsd_df <- assay(vsd) %>%
+  t() %>%
+  as_tibble()
+vsd_df <- bind_cols(metadata, vsd_df)
+
+m1 <- lm(formula = WASH7P ~ DTHHRDY + AGE + SEX, data = vsd_df)
+m1_summary <- summary(m1)
+m1_tidy <- broom::tidy(m1)
+print(m1_tidy)
+
+# There does appear to be differential expression associated with sex.
+# The intercept value given indicates the predicted expression value for the
+# reference group (female). Since the value for males is much lower, there does
+# seem to be a relationship. The p-value for the male group is not very small,
+# though, so it might not be significant.
+
+m2 <- lm(formula = SLC25A47 ~ DTHHRDY + AGE + SEX, data = vsd_df)
+m2_tidy <- broom::tidy(m2)
+print(m2_tidy)
+
+# This gene also appears to have sex differential expression, with a higher VST
+# value for the reference group (female) than the male group.
+
+# Step 2.2
+
+dds <- DESeq(dds)
+
+res_sex <- results(dds, name = "SEX_male_vs_female") %>%
+  as_tibble(rownames = "GENE_ID")
+
+# Count genes with padj < 0.1
+
+sum(res_sex$padj < 0.1, na.rm = TRUE)
+
+# Merge gene locations
+results_annot <- left_join(res_sex, gene_loc, by = c("GENE_ID" = "GENE_NAME")) %>%
+  arrange(padj)
+
+# Examine top hits: which chromosomes are top genes on?
+
+head(results_annot, 10)       # Top 10 DE genes
+
+# There are more male genes at the top of the list (Y chr. genes)
+
+# How many top upregulated in males (log2FoldChange > 0) vs females (<0)?
+
+top_up_male <- filter(results_annot, padj < 0.1, log2FoldChange > 0) %>% head(10)
+
+top_up_female <- filter(results_annot, padj < 0.1, log2FoldChange < 0) %>% head(10)
+
+# The most upregulated genes in males are on the Y chromosome, while the most upregulated
+# genes in females are on the X chromosome.
+
+results_annot %>% filter(GENE_ID %in% c("WASH7P", "SLC25A47"))
+
+# The results appear to be very generally consistent in that both genes appear to be
+# upregulated in males relative to females (log2-fold change and intercept values are
+# positive in both cases).
+
+# The analysis performed illustrates the trade off between false positives and false
+# negatives in that the basic linear regression model calculated smaller p-values
+# for SLC25A47 and WASH7P indicating more significant results; however, since a 10%
+# FDR wasn't being applied, like in the DESeq2 analysis, it's possible that these
+# "significant" results aren't actually as significant as calculated (i.e., they could
+# be false positives). False negatives are also possible, though, if using a very stringent FDR, which could result in missing real hits.
+
+# Having too small of a sample size can result in not low frequency effects.
+# For example, if a gene is sometimes highly upregulated because of certain individual
+# differences or environmental/lifestyle effects, this might not be seen at all in 
+# a small sample size because of the rarity of the individual. This type of phenomenon
+# is often seen in clinical trials where rare events/side effects are only observed because of very large sample sizes (necessary for testing drugs!)
+
+# Step 2.4
+
+# Specify appropriate contrast name (use resultsNames(dds) to see available contrasts!)
+
+resultsNames(dds)
+res_death <- results(dds, name = "DTHHRDY_ventilator_case_vs_fast_death_of_natural_causes") %>%
+  as_tibble(rownames = "GENE_ID")
+sum(res_death$padj < 0.1, na.rm = TRUE)
+
+# There are 16,069 genes that are differentially expressed based on death classification.
+
+# Step 2.5: False positive rate estimation under the null
+
+# Permute SEX labels
+
+set.seed(123)
+metadata_perm <- metadata %>% mutate(SEX = sample(SEX))
+dds_perm <- DESeqDataSetFromMatrix(countData = gene_expr, colData = metadata_perm, design = ~ SEX + DTHHRDY + AGE)
+dds_perm <- DESeq(dds_perm)
+
+resultsNames(dds_perm)
+
+res_perm_sex <- results(dds_perm, name = "SEX_male_vs_female") %>% as_tibble(rownames = "GENE_ID")
+fp_count <- sum(res_perm_sex$padj < 0.1, na.rm = TRUE)
+fp_count
+
+# There are 15 false positives.
+
+```
+```{r}
+
+# Exercise 3: Visualization
+
+volcano_df <- res_sex %>%
+    mutate(sig = padj < 0.1 & abs(log2FoldChange) > 1)
+
+ggplot(volcano_df, aes(x = log2FoldChange, y = -log10(padj))) +
+    geom_point(aes(color = sig)) +
+    scale_color_manual(values = c("grey", "red")) +
+    labs(title = "Volcano Plot: Sex Differential Expression",
+         x = "log2(Fold Change) (Male vs Female)",
+         y = "-log10(FDR adjusted P-value)") +
+    theme_minimal()
+
+ggsave("volcano_plot_sex.png", width = 7, height = 5)
+
+```
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
