@@ -1,0 +1,14 @@
+digraph {
+  AT -> TT;
+  CA -> AT;
+  CT -> TT;
+  GA -> AT;
+  TA -> AT;
+  TC -> CA;
+  TC -> CT;
+  TG -> GA;
+  TT -> TA;
+  TT -> TC;
+  TT -> TG;
+  TT -> TT;
+}

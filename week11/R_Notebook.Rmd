@@ -1,0 +1,115 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+setwd('/Users/cmdb/qb25-answers/week11')
+
+# Read coverage data
+coverage <- scan("coverage_3x.txt")
+
+# Histogram
+histout <- hist(coverage,
+     breaks = -0.5:max(coverage)+0.5,
+     freq = TRUE,
+     col = rgb(0, 0, 1, 0.3),
+     border = 'white',
+     main = "3x Coverage Histogram (1Mbp genome, 100bp reads)",
+     xlab = "Coverage (Read depth)",
+     ylab = "Bases (count)", 
+     ylim = c(0, max(table(coverage))*1.2)
+)
+
+# Overlay Poisson PMF
+lambda <- 3
+kvals <- 0:max(coverage)
+poisson_freqs <- dpois(kvals, lambda) * length(coverage)
+lines(kvals, poisson_freqs, type='b', pch=16, col='red', lwd=2)
+
+# Overlay normal PDF (turn into frequencies with binwidth=1)
+mu <- 3
+sigma <- sqrt(3)
+normal_freqs <- dnorm(kvals, mu, sigma) * length(coverage)
+lines(kvals, normal_freqs, col="darkgreen", lwd=2, lty=2)
+
+legend("topright",
+       legend=c("Empirical data", "Poisson λ=3", "Normal (μ=3, σ=1.73)"),
+       col=c("blue", "red", "darkgreen"),
+       lwd=c(10,1,1), lty = c(1,1,2), pch=c(15, NA, NA))
+
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+```{r}
+# Step 1.4
+
+sum(coverage == 0) / length(coverage)
+
+```
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+```{r}
+
+coverage <- scan("coverage_10x.txt")
+lambda <- 10
+mu <- 10
+sigma <- sqrt(10)  # 3.16
+
+histout <- hist(coverage,
+    breaks = -0.5:max(coverage)+0.5,
+    freq = TRUE, col = rgb(0,0,1,0.3), border='white',
+    main="10x Coverage Histogram", xlab="Coverage", ylab="Bases (count)",
+    ylim=c(0,max(table(coverage))*1.2))
+
+kvals <- 0:max(coverage)
+poisson_freqs <- dpois(kvals, lambda) * length(coverage)
+lines(kvals, poisson_freqs, type='b', pch=16, col='red', lwd=2)
+normal_freqs <- dnorm(kvals, mu, sigma) * length(coverage)
+lines(kvals, normal_freqs, col="darkgreen", lwd=2, lty=2)
+legend("topright", legend=c("Empirical data", "Poisson λ=10", "Normal (μ=10, σ=3.16)"),
+       col=c("blue", "red", "darkgreen"), lwd=c(10,1,1), lty=c(1,1,2), pch=c(15, NA, NA))
+
+sum(coverage == 0) / length(coverage)
+```
+
+```{r}
+
+coverage <- scan("coverage_30x.txt")
+
+histout <- hist(coverage,
+  breaks = -0.5:max(coverage)+0.5,
+  freq = TRUE,
+  col = rgb(0, 0, 1, 0.3),
+  border = 'white',
+  main = "30x Coverage Histogram (1 Mbp, 100 bp reads)",
+  xlab = "Coverage (read depth)",
+  ylab = "Number of Bases",
+  ylim = c(0, max(table(coverage)) * 1.2)
+)
+
+lambda <- 30
+kvals <- 0:max(coverage)
+poisson_freqs <- dpois(kvals, lambda) * length(coverage)
+lines(kvals, poisson_freqs, type='b', pch=16, col='red', lwd=2)
+
+mu <- 30
+sigma <- 5.47
+normal_freqs <- dnorm(kvals, mean=mu, sd=sigma) * length(coverage)
+lines(kvals, normal_freqs, col="darkgreen", lwd=2, lty=2)
+
+legend("topright",
+       legend = c("Simulated data", "Poisson (λ=30)", "Normal (μ=30, σ=5.47)"),
+       col = c("blue", "red", "darkgreen"),
+       lwd = c(10, 2, 2), lty = c(1, 1, 2), pch=c(15, NA, NA))
+
+sum(coverage == 0) / length(coverage)
+
+```
+
